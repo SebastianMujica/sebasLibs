@@ -20,7 +20,12 @@
 - [x] Trash/ reversible delete implementation
 - [x] Rule actions: skip, rename (regex capture groups), tag, delete
 - [x] Planner respects rule-set subfolder and destination (no override)
-- [x] Tests: 43 passing (classifier, planner, executor, rule_engine, integration)
+- [x] Per-category CSV summary generation (summary_plan.txt with stats)
+- [x] Weekly subdivision (Week 23 2024) when exceeding max-per-folder
+- [x] Letter subdivision when exceeding max-per-folder
+- [x] 7z/RAR optional support with graceful degradation (py7zr, rarfile)
+- [x] Rules.yaml example with real-world use cases
+- [x] Tests: 45 passing
 - [x] Lint: ruff clean
 - [x] Git remote: https://github.com/SebastianMujica/sebasLibs.git
 
@@ -30,16 +35,12 @@
 
 ## 🔜 Next Up
 
-- [ ] Per-category CSV summary generation in plan
-- [ ] Weekly subdivision (Week 23 2024) when exceeding max-per-folder
-- [ ] Letter subdivision when exceeding max-per-folder
-- [ ] 7z/RAR optional support with graceful degradation
 - [ ] Progress bar / TUI for large operations
+- [ ] EXIF date override for timeline subfolder adjustment
+- [ ] Cross-platform path handling (Windows drive letters, UNC paths)
 
 ## 📋 Backlog
 
 - [ ] Dedupe tool (hash-based duplicate detection)
-- [ ] EXIF date override for timeline subfolder adjustment
-- [ ] Cross-platform path handling (Windows drive letters, UNC paths)
 - [ ] CI/CD pipeline (GitHub Actions: lint + test)
 - [ ] Type checking (mypy strict mode)

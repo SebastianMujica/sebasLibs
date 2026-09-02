@@ -55,6 +55,10 @@ class Planner:
                     entries.append(fe)
 
         plan.entries = entries
+
+        # Apply max-per-folder subdivision after initial assignment
+        self._apply_max_per_folder(plan)
+
         return plan
 
     def _assign_destination(self, entry: FileEntry) -> None:
@@ -91,15 +95,81 @@ class Planner:
         entry.subfolder = "/".join(parts[1:]) if len(parts) > 1 else entry.subfolder
 
     def _build_timeline(self, entry: FileEntry) -> str | None:
-        """Build human-friendly timeline: Year/Month or Year/Week##."""
+        """Build human-friendly timeline: Year/Month."""
         ref_date = entry.date_taken or entry.modified
         if not ref_date:
             return None
 
         year = ref_date.year
-        month_name = calendar.month_name[ref_date.month]  # e.g. "June"
-        timeline = f"{year}/{month_name}"
+        month_name = calendar.month_name[ref_date.month]
+        return f"{year}/{month_name}"
 
-        # If we need subdivide by week or letter when exceeding max_per_folder
-        # This is handled at execution time when we count files per folder
-        return timeline
+    def _apply_max_per_folder(self, plan: Plan) -> None:
+        """Subdivide folders that exceed max_per_folder.
+
+        Strategy:
+        1. Week subdivision: "2024/June/Week 23 2024"
+        2. Letter subdivision: "2024/June/A", "2024/June/B", etc.
+        """
+        # Group entries by their base folder (category + timeline)
+        folder_groups: dict[str, list[FileEntry]] = {}
+        for entry in plan.entries:
+            if not entry.destination_path or entry.metadata.get("action") == "skip":
+                continue
+            base = entry.destination_path.parent
+            folder_groups.setdefault(str(base), []).append(entry)
+
+        for folder_path, entries in folder_groups.items():
+            if len(entries) <= plan.max_per_folder:
+                continue
+
+            # Try week subdivision first
+            if self._subdivide_by_week(entries, Path(folder_path)):
+                continue
+            # Fall back to letter subdivision
+            self._subdivide_by_letter(entries, Path(folder_path))
+
+    def _subdivide_by_week(self, entries: list[FileEntry], base_path: Path) -> bool:
+        """Subdivide entries into weekly folders. Returns True if successful."""
+        week_groups: dict[str, list[FileEntry]] = {}
+
+        for entry in entries:
+            ref_date = entry.date_taken or entry.modified
+            if ref_date:
+                iso_year, iso_week, _ = ref_date.isocalendar()
+                week_key = f"Week {iso_week} {iso_year}"
+                week_groups.setdefault(week_key, []).append(entry)
+            else:
+                week_groups.setdefault("Undated", []).append(entry)
+
+        # Check if any week group still exceeds max
+        for week_entries in week_groups.values():
+            if len(week_entries) > self.max_per_folder:
+                return False  # Week subdivision not sufficient
+
+        # Apply week subdivision
+        for week_key, week_entries in week_groups.items():
+            for entry in week_entries:
+                current_sub = entry.subfolder or ""
+                new_sub = f"{current_sub}/{week_key}" if current_sub else week_key
+                entry.subfolder = new_sub
+                entry.destination_path = self.destination / new_sub / entry.original_name
+
+        return True
+
+    def _subdivide_by_letter(self, entries: list[FileEntry], base_path: Path) -> None:
+        """Subdivide entries by first letter of filename."""
+        letter_groups: dict[str, list[FileEntry]] = {}
+
+        for entry in entries:
+            letter = entry.original_name[0].upper() if entry.original_name else "0"
+            if not letter.isalnum():
+                letter = "0"
+            letter_groups.setdefault(letter, []).append(entry)
+
+        for letter, letter_entries in letter_groups.items():
+            current_sub = letter_entries[0].subfolder or ""
+            new_sub = f"{current_sub}/{letter}" if current_sub else letter
+            for entry in letter_entries:
+                entry.subfolder = new_sub
+                entry.destination_path = self.destination / new_sub / entry.original_name

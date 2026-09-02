@@ -24,6 +24,15 @@ CSV_COLUMNS = [
 ]
 
 
+def _format_size(size_bytes: int) -> str:
+    """Format bytes into human-readable size."""
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if size_bytes < 1024:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.1f} PB"
+
+
 class CsvStore(PlanStorePort):
     def __init__(self) -> None:
         self._index_file = "index.csv"
@@ -52,6 +61,34 @@ class CsvStore(PlanStorePort):
                 writer.writeheader()
                 for entry in cat_entries:
                     writer.writerow(self._entry_to_dict(entry))
+
+        # Summary plan
+        self._save_summary(plan, output_dir, categories)
+
+    def _save_summary(self, plan: Plan, output_dir: Path, categories: dict[str, list[FileEntry]]) -> None:
+        """Generate summary_plan.txt with statistics."""
+        summary_path = output_dir / "summary_plan.txt"
+        total_size = sum(e.size_bytes for e in plan.entries)
+
+        with open(summary_path, "w", encoding="utf-8") as f:
+            f.write("Plan Summary\n")
+            f.write(f"{'=' * 50}\n")
+            f.write(f"Source: {plan.source}\n")
+            f.write(f"Destination: {plan.destination}\n")
+            f.write(f"Max per folder: {plan.max_per_folder}\n")
+            f.write(f"Total files: {plan.total_count}\n")
+            f.write(f"Total size: {_format_size(total_size)}\n")
+            f.write("\nCategories:\n")
+            for cat_name in sorted(categories.keys()):
+                cat_entries = categories[cat_name]
+                cat_size = sum(e.size_bytes for e in cat_entries)
+                f.write(f"  {cat_name}: {len(cat_entries)} files ({_format_size(cat_size)})\n")
+            f.write("\nStatuses:\n")
+            status_counts: dict[str, int] = {}
+            for entry in plan.entries:
+                status_counts[entry.status.value] = status_counts.get(entry.status.value, 0) + 1
+            for status, count in sorted(status_counts.items()):
+                f.write(f"  {status}: {count}\n")
 
     def load_plan(self, output_dir: Path) -> Plan | None:
         index_path = output_dir / self._index_file

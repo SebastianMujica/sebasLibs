@@ -1,12 +1,66 @@
-# rules: default skeleton — first match wins
-#
-# Each rule has:
-#   conditions: one or more filters (all must match)
-#   actions: one or more operations (all are applied)
+# rules.yaml — Declarative rules for sebas-organize
+# First match wins. Evaluated BEFORE the default classifier.
 #
 # Conditions: name, name_regex, name_contains, extension, base_category,
 #             size_gte, size_lte, year, month, date_gte, date_lte,
 #             is_archive, has_password
 # Actions: move_to, move_to_category, subfolder, delete, rename, skip, extract, tag
 
-rules: []
+rules:
+  # Skip system files
+  - conditions:
+      name_regex: "^\\."
+    actions:
+      skip: true
+
+  # Move all invoices to Documents/invoices
+  - conditions:
+      name_contains: "invoice"
+    actions:
+      move_to_category: Documents
+      subfolder: invoices
+
+  # Organize screenshots differently from photos
+  - conditions:
+      name_regex: "^(Screenshot|Captura|Screen Shot)"
+    actions:
+      move_to_category: Documents
+      subfolder: screenshots
+
+  # Large archives go to a separate folder
+  - conditions:
+      is_archive: true
+      size_gte: 104857600  # 100 MB
+    actions:
+      subfolder: large_archives
+
+  # Delete temporary files (reversible, goes to Trash/)
+  - conditions:
+      name_regex: "~.*"
+    actions:
+      delete: trash
+
+  # Hard delete .tmp files permanently
+  - conditions:
+      extension: ".tmp"
+    actions:
+      delete: hard
+
+  # Rename camera photos with date prefix
+  - conditions:
+      name_regex: "^(IMG|DSC)_?(\\d{8})\\."
+    actions:
+      rename: "photo_\\2.jpg"
+
+  # Tag important contracts
+  - conditions:
+      name_contains: "contract"
+      extension: ".pdf"
+    actions:
+      tag: ["important", "legal"]
+
+  # Skip thumbnail files
+  - conditions:
+      name_regex: "^Thumbs\\.db$"
+    actions:
+      skip: true
