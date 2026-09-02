@@ -23,6 +23,7 @@ def main() -> None:
     exec_parser.add_argument("--plan-dir", required=True, help="Directory containing the plan CSV files")
     exec_parser.add_argument("--simulate", action="store_true", help="Show what would happen without moving")
     exec_parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
+    exec_parser.add_argument("--hard-delete", action="store_true", help="Permanently delete instead of moving to trash")
 
     # metadata
     meta_parser = subparsers.add_parser("metadata", help="Extract EXIF metadata from photos")
@@ -99,6 +100,7 @@ def _run_execute(args: argparse.Namespace) -> None:
         plan=plan,
         simulate=args.simulate,
         resume=args.resume,
+        hard_delete=args.hard_delete,
     )
     results = use_case.execute()
 
@@ -158,6 +160,9 @@ def _run_metadata(args: argparse.Namespace) -> None:
 
 
 def _run_verify(args: argparse.Namespace) -> None:
+    import zipfile
+    from datetime import datetime
+
     from ..adapters.verifier import Verifier
 
     source = Path(args.source).resolve()
@@ -166,6 +171,15 @@ def _run_verify(args: argparse.Namespace) -> None:
     ok = sum(1 for v in results.values() if v == "ok")
     bad = sum(1 for v in results.values() if v == "corrupted")
     print(f"Verified {len(results)} files: {ok} OK, {bad} issues")
+
+    if args.zip:
+        report_name = f"verify_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        report_path = source / report_name
+        with zipfile.ZipFile(report_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for path, status in results.items():
+                relative = Path(path).relative_to(source)
+                zf.writestr(f"{status}/{relative!s}", "")
+        print(f"Report saved to {report_path}")
 
 
 def _run_extract(args: argparse.Namespace) -> None:
@@ -182,6 +196,9 @@ def _run_extract(args: argparse.Namespace) -> None:
                 continue
             extracted = reader.extract(item, destination)
             print(f"Extracted {len(extracted)} files from {item.name}")
+            if args.delete_after_archive and extracted:
+                item.unlink()
+                print(f"Deleted original: {item.name}")
 
 
 def _count_categories(entries: list) -> dict:

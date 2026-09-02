@@ -59,6 +59,10 @@ class Planner:
 
     def _assign_destination(self, entry: FileEntry) -> None:
         """Build the destination path based on category and timeline."""
+        # If rules already set a destination, respect it
+        if entry.destination_path:
+            return
+
         parts: list[str] = []
 
         # Category-based base folder
@@ -67,8 +71,11 @@ class Planner:
         else:
             parts.append(Category.OTHERS.value)
 
+        # If rules already set a subfolder, use it
+        if entry.subfolder:
+            parts.append(entry.subfolder)
         # Timeline subfolder for Photos
-        if entry.category == Category.PHOTOS:
+        elif entry.category == Category.PHOTOS:
             timeline = self._build_timeline(entry)
             if timeline:
                 parts.append(timeline)
@@ -81,7 +88,7 @@ class Planner:
 
         dest = self.destination / Path(*parts)
         entry.destination_path = dest / entry.original_name
-        entry.subfolder = "/".join(parts[1:]) if len(parts) > 1 else None
+        entry.subfolder = "/".join(parts[1:]) if len(parts) > 1 else entry.subfolder
 
     def _build_timeline(self, entry: FileEntry) -> str | None:
         """Build human-friendly timeline: Year/Month or Year/Week##."""

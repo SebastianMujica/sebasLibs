@@ -61,3 +61,75 @@ class TestExecutor:
         new_path = mover.safe_move(Path("/dummy/source.jpg"), existing)
 
         assert new_path.name == "photo (1).jpg"
+
+    def test_trash_delete(self, tmp_dir):
+        source = tmp_dir / "source"
+        dest = tmp_dir / "dest"
+        source.mkdir()
+        file_path = source / "junk.tmp"
+        file_path.write_text("delete me")
+
+        entry = FileEntry(
+            original_name="junk.tmp",
+            source_path=file_path,
+            category=Category.OTHERS,
+            status=FileStatus.PENDING,
+        )
+        entry.metadata["action"] = "delete"
+        entry.metadata["delete_dest"] = "trash"
+
+        plan = Plan(source=source, destination=dest, entries=[entry])
+        executor = Executor(plan, simulate=False, hard_delete=False)
+        results = executor.run()
+
+        assert results[0].status == FileStatus.MOVED
+        assert not file_path.exists()
+        trash_file = dest / "Trash" / "junk.tmp"
+        assert trash_file.exists()
+        assert results[0].metadata["deleted"] == "trash"
+
+    def test_hard_delete(self, tmp_dir):
+        source = tmp_dir / "source"
+        dest = tmp_dir / "dest"
+        source.mkdir()
+        file_path = source / "junk.tmp"
+        file_path.write_text("delete me permanently")
+
+        entry = FileEntry(
+            original_name="junk.tmp",
+            source_path=file_path,
+            category=Category.OTHERS,
+            status=FileStatus.PENDING,
+        )
+        entry.metadata["action"] = "delete"
+        entry.metadata["delete_dest"] = "trash"
+
+        plan = Plan(source=source, destination=dest, entries=[entry])
+        executor = Executor(plan, simulate=False, hard_delete=True)
+        results = executor.run()
+
+        assert results[0].status == FileStatus.MOVED
+        assert not file_path.exists()
+        assert results[0].metadata["deleted"] == "hard"
+
+    def test_skip_action(self, tmp_dir):
+        source = tmp_dir / "source"
+        dest = tmp_dir / "dest"
+        source.mkdir()
+        file_path = source / "keep.txt"
+        file_path.write_text("keep me")
+
+        entry = FileEntry(
+            original_name="keep.txt",
+            source_path=file_path,
+            category=Category.DOCUMENTS,
+            status=FileStatus.PENDING,
+        )
+        entry.metadata["action"] = "skip"
+
+        plan = Plan(source=source, destination=dest, entries=[entry])
+        executor = Executor(plan, simulate=False)
+        results = executor.run()
+
+        assert results[0].status == FileStatus.PENDING
+        assert file_path.exists()

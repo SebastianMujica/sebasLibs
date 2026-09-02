@@ -16,11 +16,15 @@ class Executor:
         mover: FileMoverPort | None = None,
         simulate: bool = False,
         resume: bool = False,
+        trash_dir: Path | None = None,
+        hard_delete: bool = False,
     ) -> None:
         self.plan = plan
         self.mover = mover or DefaultMover()
         self.simulate = simulate
         self.resume = resume
+        self.trash_dir = trash_dir or plan.destination / "Trash"
+        self.hard_delete = hard_delete
 
     def run(self) -> list[FileEntry]:
         """Execute the plan, moving files and updating status."""
@@ -32,6 +36,19 @@ class Executor:
 
         for entry in entries:
             if entry.status == FileStatus.MOVED:
+                continue
+
+            # Handle skip action from rules
+            if entry.metadata.get("action") == "skip":
+                entry.status = FileStatus.PENDING
+                results.append(entry)
+                continue
+
+            # Handle delete action from rules
+            if entry.metadata.get("action") == "delete":
+                if not self.simulate:
+                    self._delete_file(entry)
+                results.append(entry)
                 continue
 
             entry.status = FileStatus.PROCESSING
@@ -63,6 +80,32 @@ class Executor:
             results.append(entry)
 
         return results
+
+    def _delete_file(self, entry: FileEntry) -> None:
+        """Delete or move to trash based on hard_delete flag."""
+        if not entry.source_path.exists():
+            entry.status = FileStatus.ERROR
+            return
+
+        if self.hard_delete:
+            try:
+                entry.source_path.unlink()
+                entry.status = FileStatus.MOVED
+                entry.metadata["deleted"] = "hard"
+            except OSError:
+                entry.status = FileStatus.ERROR
+        else:
+            # Reversible delete: move to Trash/
+            trash_dest = self.trash_dir / entry.original_name
+            try:
+                safe_trash = self.mover.safe_move(entry.source_path, trash_dest)
+                self.mover.move(entry.source_path, safe_trash)
+                entry.status = FileStatus.MOVED
+                entry.destination_path = safe_trash
+                entry.metadata["deleted"] = "trash"
+                entry.metadata["trash_path"] = str(safe_trash)
+            except Exception:
+                entry.status = FileStatus.ERROR
 
 
 class DefaultMover(FileMoverPort):

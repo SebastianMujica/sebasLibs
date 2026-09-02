@@ -13,7 +13,14 @@
 - [x] `execute` CLI: load plan CSV, run executor, save checkpoint, simulate/resume
 - [x] `metadata` CLI: EXIF extraction pass, adjust subfolders by date_taken
 - [x] Integration tests: plan->execute flow, simulate, resume
-- [x] Tests: 20 passing
+- [x] YAML rules: first-match-wins engine fully wired into plan
+- [x] `--delete-after-archive` flag for extract-archives
+- [x] Verify subcommand: zip report generation
+- [x] `--hard-delete` support for rule delete action
+- [x] Trash/ reversible delete implementation
+- [x] Rule actions: skip, rename (regex capture groups), tag, delete
+- [x] Planner respects rule-set subfolder and destination (no override)
+- [x] Tests: 43 passing (classifier, planner, executor, rule_engine, integration)
 - [x] Lint: ruff clean
 - [x] Git remote: https://github.com/SebastianMujica/sebasLibs.git
 
@@ -23,21 +30,16 @@
 
 ## 🔜 Next Up
 
-- [ ] Activate YAML rules (first-match-wins engine fully wired into plan)
-- [ ] `--delete-after-archive` flag for extract-archives
-- [ ] Verify subcommand: zip report generation
 - [ ] Per-category CSV summary generation in plan
-- [ ] `--hard-delete` support for rule delete action
-- [ ] Trash/ reversible delete implementation
+- [ ] Weekly subdivision (Week 23 2024) when exceeding max-per-folder
+- [ ] Letter subdivision when exceeding max-per-folder
+- [ ] 7z/RAR optional support with graceful degradation
+- [ ] Progress bar / TUI for large operations
 
 ## 📋 Backlog
 
 - [ ] Dedupe tool (hash-based duplicate detection)
-- [ ] 7z/RAR optional support with graceful degradation
 - [ ] EXIF date override for timeline subfolder adjustment
-- [ ] Progress bar / TUI for large operations
-- [ ] Weekly subdivision (Week 23 2024) when exceeding max-per-folder
-- [ ] Letter subdivision when exceeding max-per-folder
 - [ ] Cross-platform path handling (Windows drive letters, UNC paths)
 - [ ] CI/CD pipeline (GitHub Actions: lint + test)
 - [ ] Type checking (mypy strict mode)

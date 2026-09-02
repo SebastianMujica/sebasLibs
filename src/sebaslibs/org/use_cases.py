@@ -40,15 +40,18 @@ class ExecuteUseCase:
         plan: Plan,
         simulate: bool = False,
         resume: bool = False,
+        hard_delete: bool = False,
     ) -> None:
         self.plan = plan
         self.simulate = simulate
         self.resume = resume
+        self.hard_delete = hard_delete
 
     def execute(self) -> list:
         executor = Executor(
             plan=self.plan,
             simulate=self.simulate,
             resume=self.resume,
+            hard_delete=self.hard_delete,
         )
         return executor.run()
