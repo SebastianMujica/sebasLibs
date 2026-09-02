@@ -10,14 +10,16 @@
 - [x] Adapters: fs_reader, fs_mover, csv_store, archiver, verifier, pillow_meta
 - [x] Use cases: PlanUseCase, ExecuteUseCase
 - [x] CLI entry point: `sebas-organize` (plan, execute, metadata, verify, extract-archives)
-- [x] Tests: 17 passing (classifier, planner, executor)
+- [x] `execute` CLI: load plan CSV, run executor, save checkpoint, simulate/resume
+- [x] `metadata` CLI: EXIF extraction pass, adjust subfolders by date_taken
+- [x] Integration tests: plan->execute flow, simulate, resume
+- [x] Tests: 20 passing
 - [x] Lint: ruff clean
 - [x] Git remote: https://github.com/SebastianMujica/sebasLibs.git
 
 ## 🚧 In Progress
 
-- [ ] Complete `execute` CLI subcommand (load plan CSV, resume from checkpoint)
-- [ ] Complete `metadata` CLI subcommand (EXIF extraction pass, adjust subfolders)
+(none — ready for next iteration)
 
 ## 🔜 Next Up
 

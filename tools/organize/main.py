@@ -20,12 +20,13 @@ def main() -> None:
 
     # execute
     exec_parser = subparsers.add_parser("execute", help="Execute a plan")
+    exec_parser.add_argument("--plan-dir", required=True, help="Directory containing the plan CSV files")
     exec_parser.add_argument("--simulate", action="store_true", help="Show what would happen without moving")
     exec_parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
 
     # metadata
     meta_parser = subparsers.add_parser("metadata", help="Extract EXIF metadata from photos")
-    meta_parser.add_argument("--source", required=True, help="Source directory")
+    meta_parser.add_argument("--plan-dir", required=True, help="Directory containing the plan CSV files")
 
     # verify
     verify_parser = subparsers.add_parser("verify", help="Verify moved files")
@@ -81,11 +82,79 @@ def _run_plan(args: argparse.Namespace) -> None:
 
 
 def _run_execute(args: argparse.Namespace) -> None:
-    print("Execute not yet fully implemented (skeleton only)")
+    from ..adapters.csv_store import CsvStore
+    from ..org.use_cases import ExecuteUseCase
+
+    plan_dir = Path(args.plan_dir).resolve()
+    store = CsvStore()
+    plan = store.load_plan(plan_dir)
+
+    if plan is None:
+        print(f"No plan found in {plan_dir}. Run 'plan' first.")
+        sys.exit(1)
+
+    print(f"Loaded plan: {plan.total_count} files, {plan.pending_count} pending")
+
+    use_case = ExecuteUseCase(
+        plan=plan,
+        simulate=args.simulate,
+        resume=args.resume,
+    )
+    results = use_case.execute()
+
+    moved = sum(1 for r in results if r.status.value == "moved")
+    errors = sum(1 for r in results if r.status.value == "error")
+    skipped = sum(1 for r in results if r.status.value == "pending")
+
+    if not args.simulate:
+        store.save_checkpoint(plan, plan_dir)
+
+    print(f"Results: {moved} moved, {errors} errors, {skipped} skipped")
+    if args.simulate:
+        print("(simulate mode — no files were moved)")
 
 
 def _run_metadata(args: argparse.Namespace) -> None:
-    print("Metadata extraction not yet fully implemented (skeleton only)")
+    import calendar
+    from pathlib import Path
+
+    from ..adapters.csv_store import CsvStore
+    from ..adapters.pillow_meta import PillowMetadataExtractor
+    from ..core.entities import Category
+
+    plan_dir = Path(args.plan_dir).resolve()
+    store = CsvStore()
+    extractor = PillowMetadataExtractor()
+
+    plan = store.load_plan(plan_dir)
+    if plan is None:
+        print(f"No plan found in {plan_dir}. Run 'plan' first.")
+        sys.exit(1)
+
+    photo_entries = [e for e in plan.entries if e.category == Category.PHOTOS]
+    print(f"Extracting EXIF from {len(photo_entries)} photos...")
+
+    updated = 0
+    for entry in photo_entries:
+        exif = extractor.extract_exif(entry.source_path)
+        if not exif:
+            continue
+
+        if "date_taken_parsed" in exif:
+            entry.date_taken = exif["date_taken_parsed"]
+            dt = entry.date_taken
+            entry.subfolder = f"{dt.year}/{calendar.month_name[dt.month]}"
+            entry.destination_path = plan.destination / entry.subfolder / entry.original_name
+
+        if "camera" in exif:
+            entry.camera = exif["camera"]
+        if "resolution" in exif:
+            entry.resolution = exif["resolution"]
+
+        updated += 1
+
+    store.save_plan(plan, plan_dir)
+    print(f"Updated {updated}/{len(photo_entries)} photos with EXIF data")
 
 
 def _run_verify(args: argparse.Namespace) -> None:
