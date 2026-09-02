@@ -1,9 +1,12 @@
 """Integration test: plan -> execute end-to-end."""
 
+import calendar
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 from sebaslibs.adapters.csv_store import CsvStore
+from sebaslibs.adapters.pillow_meta import PillowMetadataExtractor
 from sebaslibs.core.entities import Category, FileEntry, FileStatus, Plan
 from sebaslibs.org.executor import Executor
 from sebaslibs.org.planner import Planner
@@ -201,3 +204,49 @@ rules:
 
         moved = sum(1 for r in results if r.status == FileStatus.MOVED)
         assert moved == 2
+
+
+class TestExifDateOverride:
+    def test_exif_date_override_changes_subfolder(self, tmp_path):
+        """When --use-exif-date is set, timeline should use EXIF date."""
+        src = tmp_path / "source"
+        src.mkdir()
+
+        # Create a photo with a fake mtime but we'll simulate EXIF date
+        (src / "photo.jpg").write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)
+
+        dest = tmp_path / "dest"
+        plan_dir = dest / "_organizer"
+
+        # Plan the photo (will be classified as Photos with mdate-based timeline)
+        planner = Planner(source=src, destination=dest)
+        plan = planner.scan()
+
+        store = CsvStore()
+        store.save_plan(plan, plan_dir)
+
+        # Load plan
+        loaded_plan = store.load_plan(plan_dir)
+        assert loaded_plan is not None
+
+        photo_entry = loaded_plan.entries[0]
+        original_subfolder = photo_entry.subfolder
+
+        # Simulate EXIF extraction with a different date
+        extractor = PillowMetadataExtractor()
+        extractor.extract_exif(photo_entry.source_path)
+
+        # Manually set EXIF date (simulating a real EXIF extraction)
+        photo_entry.date_taken = datetime(2020, 3, 15, 10, 30, 0)
+        new_subfolder = f"2020/{calendar.month_name[3]}"
+        photo_entry.subfolder = new_subfolder
+        photo_entry.destination_path = loaded_plan.destination / new_subfolder / photo_entry.original_name
+
+        # Save updated plan
+        store.save_plan(loaded_plan, plan_dir)
+
+        # Verify subfolder changed
+        reloaded = store.load_plan(plan_dir)
+        updated_entry = reloaded.entries[0]
+        assert updated_entry.subfolder == "2020/March"
+        assert updated_entry.subfolder != original_subfolder

@@ -25,7 +25,9 @@
 - [x] Letter subdivision when exceeding max-per-folder
 - [x] 7z/RAR optional support with graceful degradation (py7zr, rarfile)
 - [x] Rules.yaml example with real-world use cases
-- [x] Tests: 45 passing
+- [x] Progress bar / TUI for large operations (rich or plain text fallback)
+- [x] EXIF date override for timeline subfolder adjustment (--use-exif-date)
+- [x] Tests: 50 passing
 - [x] Lint: ruff clean
 - [x] Git remote: https://github.com/SebastianMujica/sebasLibs.git
 
@@ -35,8 +37,6 @@
 
 ## 🔜 Next Up
 
-- [ ] Progress bar / TUI for large operations
-- [ ] EXIF date override for timeline subfolder adjustment
 - [ ] Cross-platform path handling (Windows drive letters, UNC paths)
 
 ## 📋 Backlog
