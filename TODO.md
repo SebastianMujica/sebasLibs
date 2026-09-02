@@ -35,10 +35,12 @@
 
 ## 🚧 In Progress
 
-(none — ready for next iteration)
+- [ ] Review CSV classification results from /mnt/e/Pictures test
+- [ ] Execute real move (after CSV review approval)
 
 ## 🔜 Next Up
 
+- [ ] Execute real move on /mnt/e/Pictures (pending CSV review)
 - [ ] Cross-platform path handling (Windows drive letters, UNC paths)
 
 ## 📋 Backlog
@@ -46,3 +48,19 @@
 - [ ] Dedupe tool (hash-based duplicate detection)
 - [ ] CI/CD pipeline (GitHub Actions: lint + test)
 - [ ] Type checking (mypy strict mode)
+
+---
+
+## 📌 Session Notes
+
+### Real Folder Test: /mnt/e/Pictures
+- **Date:** 2025-09-02
+- **Files:** 56 total (327.9 MB)
+  - Photos: 35 files (24.1 MB) → organized by Year/Month
+  - Documents: 11 files (3.1 MB)
+  - Archives: 4 files (206.6 MB)
+  - Videos: 3 files (13.5 MB)
+  - Others: 3 files (80.6 MB)
+- **CSV files** copied to Windows desktop for review
+- **Status:** Plan generated, execute simulated (no moves yet)
+- **Next:** Review CSV → approve → execute real move
