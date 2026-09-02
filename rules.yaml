@@ -1,0 +1,12 @@
+# rules: default skeleton — first match wins
+#
+# Each rule has:
+#   conditions: one or more filters (all must match)
+#   actions: one or more operations (all are applied)
+#
+# Conditions: name, name_regex, name_contains, extension, base_category,
+#             size_gte, size_lte, year, month, date_gte, date_lte,
+#             is_archive, has_password
+# Actions: move_to, move_to_category, subfolder, delete, rename, skip, extract, tag
+
+rules: []
