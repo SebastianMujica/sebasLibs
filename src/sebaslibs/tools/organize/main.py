@@ -1,5 +1,3 @@
-"""CLI entry point for sebas-organize."""
-
 from __future__ import annotations
 
 import argparse
@@ -60,9 +58,9 @@ def main() -> None:
 
 
 def _run_plan(args: argparse.Namespace) -> None:
-    from ..adapters.csv_store import CsvStore
-    from ..adapters.progress_bar import ProgressHelper
-    from ..org.use_cases import PlanUseCase
+    from ...adapters.csv_store import CsvStore
+    from ...adapters.progress_bar import ProgressHelper
+    from ...org.use_cases import PlanUseCase
 
     source = Path(args.source).resolve()
     destination = Path(args.destination).resolve() if args.destination else source / "_organizer"
@@ -89,9 +87,9 @@ def _run_plan(args: argparse.Namespace) -> None:
 
 
 def _run_execute(args: argparse.Namespace) -> None:
-    from ..adapters.csv_store import CsvStore
-    from ..adapters.progress_bar import ProgressHelper
-    from ..org.use_cases import ExecuteUseCase
+    from ...adapters.csv_store import CsvStore
+    from ...adapters.progress_bar import ProgressHelper
+    from ...org.use_cases import ExecuteUseCase
 
     plan_dir = Path(args.plan_dir).resolve()
     store = CsvStore()
@@ -131,10 +129,10 @@ def _run_metadata(args: argparse.Namespace) -> None:
     import calendar
     from pathlib import Path
 
-    from ..adapters.csv_store import CsvStore
-    from ..adapters.pillow_meta import PillowMetadataExtractor
-    from ..adapters.progress_bar import ProgressHelper
-    from ..core.entities import Category
+    from ...adapters.csv_store import CsvStore
+    from ...adapters.pillow_meta import PillowMetadataExtractor
+    from ...adapters.progress_bar import ProgressHelper
+    from ...core.entities import Category
 
     plan_dir = Path(args.plan_dir).resolve()
     store = CsvStore()
@@ -174,7 +172,7 @@ def _run_verify(args: argparse.Namespace) -> None:
     import zipfile
     from datetime import datetime
 
-    from ..adapters.verifier import Verifier
+    from ...adapters.verifier import Verifier
 
     source = Path(args.source).resolve()
     verifier = Verifier()
@@ -194,8 +192,8 @@ def _run_verify(args: argparse.Namespace) -> None:
 
 
 def _run_extract(args: argparse.Namespace) -> None:
-    from ..adapters.archiver import ArchiveReader
-    from ..adapters.progress_bar import ProgressHelper
+    from ...adapters.archiver import ArchiveReader
+    from ...adapters.progress_bar import ProgressHelper
 
     source = Path(args.source).resolve()
     destination = Path(args.destination).resolve() if args.destination else source / "_extracted"

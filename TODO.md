@@ -7,7 +7,7 @@
 - [x] Classifier: extension + magic bytes, corruption detection
 - [x] Planner: os.scandir, timeline (Year/Month), destination assignment
 - [x] Executor: move, simulate, resume, collision handling
-- [x] Adapters: fs_reader, fs_mover, csv_store, archiver, verifier, pillow_meta
+- [x] Adapters: fs_reader, fs_mover, csv_store, archiver, verifier, pillow_meta, progress_bar
 - [x] Use cases: PlanUseCase, ExecuteUseCase
 - [x] CLI entry point: `sebas-organize` (plan, execute, metadata, verify, extract-archives)
 - [x] `execute` CLI: load plan CSV, run executor, save checkpoint, simulate/resume
@@ -27,6 +27,8 @@
 - [x] Rules.yaml example with real-world use cases
 - [x] Progress bar / TUI for large operations (rich or plain text fallback)
 - [x] EXIF date override for timeline subfolder adjustment (--use-exif-date)
+- [x] Full documentation (README.md with all commands, flags, rules, examples)
+- [x] Tested on real folder: /mnt/e/Pictures (56 files, 327.9 MB)
 - [x] Tests: 50 passing
 - [x] Lint: ruff clean
 - [x] Git remote: https://github.com/SebastianMujica/sebasLibs.git
