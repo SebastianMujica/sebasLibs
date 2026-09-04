@@ -112,6 +112,22 @@ sebas-organize extract-archives --source /path/to/archives \
 | `--destination` | `<source>/_extracted` | Where to extract files |
 | `--delete-after-archive` | `false` | Delete original after successful extraction |
 
+### `undo` — Reverse a previous execute
+
+Moves files back from their organized location to their original location. Uses the CSV to track where each file came from.
+
+```bash
+sebas-organize undo --plan-dir /path/to/plan_dir \
+    --simulate
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--plan-dir` | (required) | Directory containing the plan CSV files |
+| `--simulate` | `false` | Preview what would be undone without moving |
+
+Only reverses files with status `moved`. Files that failed or were skipped are left in place.
+
 ## Classification
 
 Files are classified by **extension + magic bytes** into:
