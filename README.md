@@ -118,15 +118,36 @@ Moves files back from their organized location to their original location. Uses 
 
 ```bash
 sebas-organize undo --plan-dir /path/to/plan_dir \
-    --simulate
+    --simulate \
+    --include-errors
 ```
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--plan-dir` | (required) | Directory containing the plan CSV files |
 | `--simulate` | `false` | Preview what would be undone without moving |
+| `--include-errors` | `false` | Also reset error entries to pending |
 
 Only reverses files with status `moved`. Files that failed or were skipped are left in place.
+Use `--include-errors` to also reset error entries.
+
+### `retry` — Retry files that failed
+
+Reprocesses entries with `error` status. Useful when a move failed due to permissions or a missing directory.
+
+```bash
+sebas-organize retry --plan-dir /path/to/plan_dir \
+    --simulate \
+    --hard-delete
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--plan-dir` | (required) | Directory containing the plan CSV files |
+| `--simulate` | `false` | Preview what would happen without moving |
+| `--hard-delete` | `false` | Permanently delete files marked for deletion |
+
+Alternatively, use `sebas-organize execute --plan-dir ... --retry-errors` to retry errors as part of a normal execute.
 
 ## Classification
 

@@ -22,6 +22,7 @@ def main() -> None:
     exec_parser.add_argument("--simulate", action="store_true", help="Show what would happen without moving")
     exec_parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
     exec_parser.add_argument("--hard-delete", action="store_true", help="Permanently delete instead of moving to trash")
+    exec_parser.add_argument("--retry-errors", action="store_true", help="Also retry files with error status")
 
     # metadata
     meta_parser = subparsers.add_parser("metadata", help="Extract EXIF metadata from photos")
@@ -43,6 +44,15 @@ def main() -> None:
     undo_parser = subparsers.add_parser("undo", help="Reverse a previous execute (move files back)")
     undo_parser.add_argument("--plan-dir", required=True, help="Directory containing the plan CSV files")
     undo_parser.add_argument("--simulate", action="store_true", help="Show what would happen without moving")
+    undo_parser.add_argument("--include-errors", action="store_true", help="Also reset error entries to pending")
+
+    # retry
+    retry_parser = subparsers.add_parser("retry", help="Retry files that failed during execute")
+    retry_parser.add_argument(
+        "--plan-dir", required=True, help="Directory containing the plan CSV files",
+    )
+    retry_parser.add_argument("--simulate", action="store_true", help="Show what would happen")
+    retry_parser.add_argument("--hard-delete", action="store_true", help="Permanently delete files")
 
     args = parser.parse_args()
 
@@ -62,6 +72,8 @@ def main() -> None:
         _run_extract(args)
     elif args.command == "undo":
         _run_undo(args)
+    elif args.command == "retry":
+        _run_retry(args)
 
 
 def _run_plan(args: argparse.Namespace) -> None:
@@ -96,6 +108,7 @@ def _run_plan(args: argparse.Namespace) -> None:
 def _run_execute(args: argparse.Namespace) -> None:
     from ...adapters.csv_store import CsvStore
     from ...adapters.progress_bar import ProgressHelper
+    from ...core.entities import FileStatus
     from ...org.use_cases import ExecuteUseCase
 
     plan_dir = Path(args.plan_dir).resolve()
@@ -106,6 +119,14 @@ def _run_execute(args: argparse.Namespace) -> None:
         print(f"No plan found in {plan_dir}. Run 'plan' first.")
         sys.exit(1)
 
+    # If --retry-errors, reset error entries to pending
+    if args.retry_errors:
+        for entry in plan.entries:
+            if entry.status == FileStatus.ERROR:
+                entry.status = FileStatus.PENDING
+        count = sum(1 for e in plan.entries if e.status == FileStatus.PENDING)
+        print(f"Reset {count} entries to pending (including errors)")
+
     print(f"Loaded plan: {plan.total_count} files, {plan.pending_count} pending")
 
     use_case = ExecuteUseCase(
@@ -115,7 +136,7 @@ def _run_execute(args: argparse.Namespace) -> None:
         hard_delete=args.hard_delete,
     )
 
-    with ProgressHelper.create(description="Executing plan", total=plan.total_count) as progress:
+    with ProgressHelper.create(description="Executing plan", total=plan.pending_count) as progress:
         results = use_case.execute()
         for _ in results:
             progress.update()
@@ -242,39 +263,45 @@ def _run_undo(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     # Only undo files that were moved
-    moved_entries = [e for e in plan.entries if e.status == FileStatus.MOVED and e.destination_path]
+    entries_to_undo = [e for e in plan.entries if e.status == FileStatus.MOVED and e.destination_path]
 
-    if not moved_entries:
+    if args.include_errors:
+        error_entries = [e for e in plan.entries if e.status == FileStatus.ERROR]
+        entries_to_undo.extend(error_entries)
+
+    if not entries_to_undo:
         print("No moved files to undo.")
         sys.exit(0)
 
-    print(f"Undoing {len(moved_entries)} moved files...")
+    print(f"Undoing {len(entries_to_undo)} files...")
 
     success = 0
     errors = 0
 
-    with ProgressHelper.create(description="Undoing moves", total=len(moved_entries)) as progress:
-        for entry in moved_entries:
+    with ProgressHelper.create(description="Undoing moves", total=len(entries_to_undo)) as progress:
+        for entry in entries_to_undo:
             if args.simulate:
-                print(f"  Would move {entry.destination_path} → {entry.source_path}")
+                print(f"  Would move {entry.destination_path or '(error)'} → {entry.source_path}")
                 success += 1
                 progress.update()
                 continue
 
-            if not entry.destination_path.exists():
-                print(f"  Warning: {entry.destination_path} not found, skipping")
-                errors += 1
-                progress.update()
-                continue
-
-            # Move back to original location
-            try:
-                entry.source_path.parent.mkdir(parents=True, exist_ok=True)
-                entry.destination_path.rename(entry.source_path)
+            # For error entries, source may still exist
+            if entry.destination_path and entry.destination_path.exists():
+                try:
+                    entry.source_path.parent.mkdir(parents=True, exist_ok=True)
+                    entry.destination_path.rename(entry.source_path)
+                    entry.status = FileStatus.PENDING
+                    success += 1
+                except Exception as e:
+                    print(f"  Error moving {entry.original_name}: {e}")
+                    errors += 1
+            elif entry.status == FileStatus.ERROR:
+                # Source still exists, just reset status
                 entry.status = FileStatus.PENDING
                 success += 1
-            except Exception as e:
-                print(f"  Error moving {entry.original_name}: {e}")
+            else:
+                print(f"  Warning: {entry.destination_path} not found, skipping")
                 errors += 1
             progress.update()
 
@@ -283,6 +310,58 @@ def _run_undo(args: argparse.Namespace) -> None:
         store.save_checkpoint(plan, plan_dir)
 
     print(f"Undo complete: {success} restored, {errors} errors")
+    if args.simulate:
+        print("(simulate mode — no files were moved)")
+
+
+def _run_retry(args: argparse.Namespace) -> None:
+    from ...adapters.csv_store import CsvStore
+    from ...adapters.progress_bar import ProgressHelper
+    from ...core.entities import FileStatus
+    from ...org.use_cases import ExecuteUseCase
+
+    plan_dir = Path(args.plan_dir).resolve()
+    store = CsvStore()
+    plan = store.load_plan(plan_dir)
+
+    if plan is None:
+        print(f"No plan found in {plan_dir}. Run 'plan' first.")
+        sys.exit(1)
+
+    error_entries = [e for e in plan.entries if e.status == FileStatus.ERROR]
+
+    if not error_entries:
+        print("No error entries to retry.")
+        sys.exit(0)
+
+    print(f"Retrying {len(error_entries)} failed files...")
+
+    # Reset errors to pending
+    for entry in error_entries:
+        entry.status = FileStatus.PENDING
+
+    use_case = ExecuteUseCase(
+        plan=plan,
+        simulate=args.simulate,
+        resume=False,
+        hard_delete=args.hard_delete,
+    )
+
+    with ProgressHelper.create(description="Retrying errors", total=len(error_entries)) as progress:
+        results = use_case.execute()
+        for _ in results:
+            progress.update()
+
+    # Filter to only show retried entries
+    retried = [r for r in results if r.status in (FileStatus.MOVED, FileStatus.ERROR)]
+    moved = sum(1 for r in retried if r.status == FileStatus.MOVED)
+    still_errors = sum(1 for r in retried if r.status == FileStatus.ERROR)
+
+    if not args.simulate:
+        store.save_plan(plan, plan_dir)
+        store.save_checkpoint(plan, plan_dir)
+
+    print(f"Retry results: {moved} fixed, {still_errors} still failing")
     if args.simulate:
         print("(simulate mode — no files were moved)")
 
