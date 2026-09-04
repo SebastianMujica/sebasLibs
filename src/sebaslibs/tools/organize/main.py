@@ -39,6 +39,11 @@ def main() -> None:
     extract_parser.add_argument("--destination", help="Extraction destination")
     extract_parser.add_argument("--delete-after-archive", action="store_true", help="Delete original after extraction")
 
+    # undo
+    undo_parser = subparsers.add_parser("undo", help="Reverse a previous execute (move files back)")
+    undo_parser.add_argument("--plan-dir", required=True, help="Directory containing the plan CSV files")
+    undo_parser.add_argument("--simulate", action="store_true", help="Show what would happen without moving")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -55,6 +60,8 @@ def main() -> None:
         _run_verify(args)
     elif args.command == "extract-archives":
         _run_extract(args)
+    elif args.command == "undo":
+        _run_undo(args)
 
 
 def _run_plan(args: argparse.Namespace) -> None:
@@ -219,6 +226,65 @@ def _count_categories(entries: list) -> dict:
     from collections import Counter
     cats = [e.category.value if e.category else "Unknown" for e in entries]
     return dict(Counter(cats))
+
+
+def _run_undo(args: argparse.Namespace) -> None:
+    from ...adapters.csv_store import CsvStore
+    from ...adapters.progress_bar import ProgressHelper
+    from ...core.entities import FileStatus
+
+    plan_dir = Path(args.plan_dir).resolve()
+    store = CsvStore()
+    plan = store.load_plan(plan_dir)
+
+    if plan is None:
+        print(f"No plan found in {plan_dir}. Run 'plan' first.")
+        sys.exit(1)
+
+    # Only undo files that were moved
+    moved_entries = [e for e in plan.entries if e.status == FileStatus.MOVED and e.destination_path]
+
+    if not moved_entries:
+        print("No moved files to undo.")
+        sys.exit(0)
+
+    print(f"Undoing {len(moved_entries)} moved files...")
+
+    success = 0
+    errors = 0
+
+    with ProgressHelper.create(description="Undoing moves", total=len(moved_entries)) as progress:
+        for entry in moved_entries:
+            if args.simulate:
+                print(f"  Would move {entry.destination_path} → {entry.source_path}")
+                success += 1
+                progress.update()
+                continue
+
+            if not entry.destination_path.exists():
+                print(f"  Warning: {entry.destination_path} not found, skipping")
+                errors += 1
+                progress.update()
+                continue
+
+            # Move back to original location
+            try:
+                entry.source_path.parent.mkdir(parents=True, exist_ok=True)
+                entry.destination_path.rename(entry.source_path)
+                entry.status = FileStatus.PENDING
+                success += 1
+            except Exception as e:
+                print(f"  Error moving {entry.original_name}: {e}")
+                errors += 1
+            progress.update()
+
+    if not args.simulate:
+        store.save_plan(plan, plan_dir)
+        store.save_checkpoint(plan, plan_dir)
+
+    print(f"Undo complete: {success} restored, {errors} errors")
+    if args.simulate:
+        print("(simulate mode — no files were moved)")
 
 
 if __name__ == "__main__":
